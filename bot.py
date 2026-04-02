@@ -51,7 +51,6 @@ def translate(text):
         "Spirits": "Espritss",
         "Candle": "Bougie",
         "Winged Light": "Winged Light"
-        "Candle cake": "Gâtougie"
     }
 
     for k, v in replacements.items():
