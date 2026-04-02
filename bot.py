@@ -6,12 +6,12 @@ import os
 # ===== CONFIG =====
 TWITTER_USER = "thatskygame"
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-CHAT_ID = os.getenv("CHAT_ID")
+CHAT_ID = str(os.getenv("CHAT_ID"))
 
 LAST_ID_FILE = "last_id.txt"
 LAST_UPDATE_FILE = "last_update.txt"
 
-# ===== GESTION FICHIERS =====
+# ===== FILE STORAGE =====
 def get_last_id():
     try:
         with open(LAST_ID_FILE, "r") as f:
@@ -36,27 +36,29 @@ def save_last_update(update_id):
 
 # ===== TWITTER =====
 def get_latest_tweet():
-    for tweet in sntwitter.TwitterUserScraper(TWITTER_USER).get_items():
-        return tweet
+    try:
+        scraper = sntwitter.TwitterUserScraper(TWITTER_USER)
+        for tweet in scraper.get_items():
+            return tweet
+    except Exception as e:
+        print("Erreur snscrape:", e)
+    return None
 
-# ===== TRADUCTION GRATUITE (simple mais safe) =====
+# ===== TRADUCTION (simple gratuite) =====
 def translate(text):
-    translated = text
-
-    # mini adaptations Sky (tu peux enrichir)
     replacements = {
         "Sky Kids": "Sky kids",
         "Sky kids": "Sky kids",
         "Season": "Saison",
-        "Spirits": "Espritss",
+        "Spirits": "Esprits",
         "Candle": "Bougie",
         "Winged Light": "Winged Light"
     }
 
     for k, v in replacements.items():
-        translated = translated.replace(k, v)
+        text = text.replace(k, v)
 
-    return translated
+    return text
 
 # ===== TELEGRAM =====
 def send_telegram(original, translated):
@@ -82,18 +84,8 @@ def send_telegram(original, translated):
         }
     )
 
-# ===== SCAN AUTOMATIQUE =====
-def auto_check():
-    tweet = get_latest_tweet()
-    last_id = get_last_id()
-
-    if tweet and tweet.id != last_id:
-        translated = translate(tweet.content)
-        send_telegram(tweet.content, translated)
-        save_last_id(tweet.id)
-
-# ===== SCAN MANUEL VIA /scan =====
-def check_manual_scan():
+# ===== CHECK COMMANDES TELEGRAM =====
+def check_commands():
     last_update = get_last_update()
 
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getUpdates"
@@ -107,10 +99,12 @@ def check_manual_scan():
 
         if "message" in update:
             text = update["message"].get("text", "").strip()
-            chat_id = update["message"]["chat"]["id"]
+            chat_id = str(update["message"]["chat"]["id"])
 
-            if str(chat_id) != str(CHAT_ID):
+            if chat_id != CHAT_ID:
                 continue
+
+            print("Commande reçue:", text)
 
             if text == "/scan":
                 tweet = get_latest_tweet()
@@ -120,10 +114,25 @@ def check_manual_scan():
 
         save_last_update(update_id)
 
+# ===== AUTO CHECK =====
+def auto_check():
+    tweet = get_latest_tweet()
+
+    if not tweet:
+        print("Aucun tweet")
+        return
+
+    last_id = get_last_id()
+
+    if tweet.id != last_id:
+        print("Nouveau tweet détecté")
+        translated = translate(tweet.content)
+        send_telegram(tweet.content, translated)
+        save_last_id(tweet.id)
+
 # ===== MAIN =====
 if __name__ == "__main__":
-    try:
-        auto_check()
-        check_manual_scan()
-    except Exception as e:
-        print("Erreur:", e)
+    print("Script lancé")
+
+    check_commands()   # IMPORTANT : avant auto
+    auto_check()
